@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USSR: Deadzone Protocol</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="damage-vignette"></div>
+    <div id="reload-indicator">ПЕРЕЗАРЯДКА...</div>
+    <div id="audio-indicator">AUDIO: INITIALIZING...</div>
+
+    <div id="start-screen" class="absolute inset-0 z-50 bg-[#121214] flex flex-col items-center justify-center text-[#e5e5e5] p-4 border-[12px] border-[#2a2a24]">
+        <div class="text-[#cc0000] mb-6 tracking-[0.6em] text-sm animate-pulse font-bold">★ MILITARY RESTRICTED ZONE ★</div>
+        <img src="Gemini_Generated_Image_b5jvpeb5jvpeb5jv.jpg" alt="USSR" class="game-logo" onerror="this.style.display='none'; document.getElementById('text-fallback').style.display='block';">
+        <div id="text-fallback" style="display: none;" class="text-center">
+            <h1 class="text-9xl font-black mb-2 text-[#cc0000] drop-shadow-[8px_8px_0_rgba(0,0,0,1)]">CCCP</h1>
+        </div>
+        <h2 class="text-2xl mb-12 text-[#ffcc00] tracking-[0.4em] uppercase">Deadzone Protocol</h2>
+        <button class="pixel-btn" id="start-btn">ENTER THE DEADZONE</button>
+        <p class="mt-4 text-[10px] text-[#666]">CLICKING STARTS AUDIO ENGINE</p>
+    </div>
+
+    <div id="gui-container">
+        <div id="crosshair">
+            <div class="ch-dot"></div>
+            <div class="ch-circle"></div>
+            <div class="ch-bracket tl"></div>
+            <div class="ch-bracket tr"></div>
+            <div class="ch-bracket bl"></div>
+            <div class="ch-bracket br"></div>
+        </div>
+        
+        <div class="absolute top-6 left-6">
+            <div class="hud-card">
+                <div class="text-[9px] text-[#ffcc00] soviet-stencil mb-1">Assault Stage</div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl text-[#ffcc00]" id="wave-count">1</span>
+                    <span class="text-xs text-[#888]" id="timer">00:00</span>
+                </div>
+                <div class="text-[9px] text-[#666] mt-1">BEST: <span id="best-timer">00:00</span></div>
+            </div>
+        </div>
+        <div class="absolute bottom-6 left-6">
+            <div class="hud-card">
+                <div class="text-[9px] text-[#cc0000] soviet-stencil mb-1">Vitality</div>
+                <div class="text-2xl flex items-center gap-2">HP <span id="hp-text">100</span></div>
+                <div class="health-bar-bg"><div id="health-fill"></div></div>
+            </div>
+        </div>
+        <div class="absolute bottom-6 right-6 text-right">
+            <div class="hud-card !pr-8">
+                <div class="text-[9px] text-[#ffcc00] soviet-stencil mb-1">Munitions</div>
+                <div class="flex items-end justify-end">
+                    <span id="ammo-count" class="text-4xl leading-none">30</span>
+                    <span class="text-lg text-[#666] mx-1">/</span>
+                    <span id="reserve-count" class="text-sm text-[#888]">120</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-over">
+            <h2 class="text-6xl mb-4 text-[#cc0000] font-black">STAY DOWN</h2>
+            <p class="text-[#888] mb-2 tracking-widest text-xs uppercase">The Motherland will not forget your failure.</p>
+            <p class="text-[#ffcc00] mb-8 tracking-widest text-sm uppercase" id="final-time-display"></p>
+            <button class="pixel-btn" onclick="location.reload()">TRY AGAIN</button>
+        </div>
+        
+        <div id="clue-popup" style="display: none; position: absolute; top: 15%; left: 50%; transform: translateX(-50%); background: rgba(20,20,15,0.95); border: 2px solid #cc0000; padding: 20px; width: 60%; max-width: 600px; text-align: center; z-index: 50; box-shadow: 5px 5px 0 #000;">
+            <div style="color: #ffcc00; font-family: 'Russo One', sans-serif; font-size: 12px; margin-bottom: 10px; letter-spacing: 1px;">CLASSIFIED INTEL RECOVERED</div>
+            <div id="clue-text" style="color: #eee; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.4;"></div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
