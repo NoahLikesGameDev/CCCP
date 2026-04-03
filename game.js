@@ -213,7 +213,7 @@ let scene, camera, renderer, clock, flashlight, muzzleFlash;
 let player = { height: 1.8, speed: 6.5, jumpStrength: 0.17, yVelocity: 0, isGrounded: true, hp: 100, ammo: 30, magSize: 30, reserve: 120, isReloading: false, isMoving: false, moveTime: 0, stepTimer: 0, reloadAnimTime: 0 };
 let controls = { forward: false, backward: false, left: false, right: false, jump: false };
 let yaw = 0, pitch = 0;
-let zombies = [], bullets = [], buildings = [], bloodParticles = [], decals = [];
+let zombies = [], bullets = [], buildings = [], bloodParticles = [], decals = [], impactSparks = [];
 let wave = 1, survivalTime = 0, gameRunning = false;
 let weaponGroup, weaponRecoil = 0;
 
@@ -466,16 +466,66 @@ function shoot() {
     if(player.isReloading || player.ammo <= 0) return;
     player.ammo--; playSound('shoot'); updateHUD();
     weaponRecoil = 0.15; muzzleFlash.intensity = 8;
-    const b = new THREE.Mesh(new THREE.SphereGeometry(0.05), new THREE.MeshBasicMaterial({color: 0xffcc00}));
+    
     const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-    b.position.copy(camera.position).add(dir.clone().multiplyScalar(0.5));
-    b.userData = { vel: dir.multiplyScalar(4), life: 60 };
-    bullets.push(b); scene.add(b);
+    const startPos = camera.position.clone().add(dir.clone().multiplyScalar(0.5));
+    
+    const bulletGroup = new THREE.Group();
+    const bulletCore = new THREE.Mesh(
+        new THREE.SphereGeometry(0.04),
+        new THREE.MeshBasicMaterial({color: 0xff3300})
+    );
+    
+    const trailGeo = new THREE.ConeGeometry(0.015, 0.5, 6);
+    const trailMat = new THREE.MeshBasicMaterial({color: 0xff2200, transparent: true, opacity: 0.8});
+    const trail = new THREE.Mesh(trailGeo, trailMat);
+    trail.rotation.x = Math.PI / 2;
+    trail.position.z = 0.3;
+    
+    const bulletLight = new THREE.PointLight(0xff4400, 0.6, 3);
+    
+    bulletGroup.add(bulletCore);
+    bulletGroup.add(trail);
+    bulletGroup.add(bulletLight);
+    bulletGroup.position.copy(startPos);
+    bulletGroup.lookAt(startPos.clone().add(dir));
+    
+    scene.add(bulletGroup);
+    
+    bullets.push({ 
+        mesh: bulletGroup, 
+        vel: dir.clone().multiplyScalar(4), 
+        life: 60,
+        trail: trail,
+        light: bulletLight
+    });
     
     const ch = document.getElementById('crosshair');
     ch.style.transition = 'none';
     ch.style.transform = 'translate(-50%, -50%) scale(1.5)';
     setTimeout(() => { ch.style.transition = 'transform 0.1s ease-out'; }, 10);
+}
+
+function createImpactSparks(pos) {
+    const colors = [0xff2200, 0xff4400, 0xff6600, 0xffaa00];
+    for(let i = 0; i < 8; i++) {
+        const size = 0.015 + Math.random() * 0.02;
+        const spark = new THREE.Mesh(
+            new THREE.BoxGeometry(size, size, size),
+            new THREE.MeshBasicMaterial({color: colors[Math.floor(Math.random() * colors.length)], transparent: true})
+        );
+        spark.position.copy(pos);
+        
+        const vel = new THREE.Vector3(
+            (Math.random() - 0.5) * 3,
+            Math.random() * 2,
+            (Math.random() - 0.5) * 3
+        );
+        
+        spark.userData = { vel: vel, life: 1.0 };
+        impactSparks.push(spark);
+        scene.add(spark);
+    }
 }
 
 function reload() {
@@ -567,6 +617,16 @@ function updateCombat(dt) {
         if(p.position.y < 0) p.position.y = 0;
         if(p.userData.life <= 0) { scene.remove(p); bloodParticles.splice(i,1); }
     }
+    
+    for(let i=impactSparks.length-1; i>=0; i--) {
+        const p = impactSparks[i];
+        p.position.add(p.userData.vel.clone().multiplyScalar(dt));
+        p.userData.vel.y -= 0.1;
+        p.userData.life -= dt * 7;
+        p.material.opacity = p.userData.life;
+        if(p.position.y < 0) p.position.y = 0;
+        if(p.userData.life <= 0) { scene.remove(p); impactSparks.splice(i,1); }
+    }
 
     for(let zi=zombies.length-1; zi>=0; zi--) {
         const z = zombies[zi];
@@ -591,12 +651,20 @@ function updateCombat(dt) {
     }
 
     for(let i=bullets.length-1; i>=0; i--) {
-        const b = bullets[i]; b.position.add(b.userData.vel); b.userData.life--;
+        const b = bullets[i];
+        b.mesh.position.add(b.vel.clone().multiplyScalar(dt * 60));
+        b.life--;
+        
+        const lifeRatio = b.life / 60;
+        b.trail.material.opacity = lifeRatio * 0.8;
+        b.light.intensity = lifeRatio * 0.6;
+        
         for(let zi=zombies.length-1; zi>=0; zi--) {
             const z = zombies[zi];
-            if(b.position.distanceTo(z.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0))) < 1.0) {
-                z.hp--; b.userData.life = 0; playSound('hit');
-                createBloodSplat(b.position);
+            if(b.mesh.position.distanceTo(z.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0))) < 1.0) {
+                z.hp--; b.life = 0; playSound('hit');
+                createBloodSplat(b.mesh.position.clone());
+                createImpactSparks(b.mesh.position.clone());
                 if(z.hp <= 0) { 
                     z.isDying = true;
                     z.deathTime = 0;
@@ -607,7 +675,7 @@ function updateCombat(dt) {
                 break;
             }
         }
-        if(b.userData.life <= 0) { scene.remove(b); bullets.splice(i,1); }
+        if(b.life <= 0) { scene.remove(b.mesh); bullets.splice(i,1); }
     }
     zombies.forEach(z => {
         if(z.isDying) return;
