@@ -265,6 +265,7 @@ function init() {
 
     generateCity();
     generateClues();
+    generateFlags();
     createWeapon();
     clock = new THREE.Clock();
     setupEvents();
@@ -292,6 +293,112 @@ function generateCity() {
         const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({map: createBuildingTexture(h>20)}));
         b.position.set(x, h/2, z);
     scene.add(b); buildings.push(b);
+    }
+}
+
+function createSovietFlagTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 192;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#cc0000';
+    ctx.fillRect(0, 0, 256, 192);
+    
+    ctx.fillStyle = '#ffcc00';
+    const cx = 128, cy = 96, r = 30;
+    ctx.beginPath();
+    for(let i = 0; i < 5; i++) {
+        const angle = (i * 72 - 90) * Math.PI / 180;
+        const x1 = cx + Math.cos(angle) * r;
+        const y1 = cy + Math.sin(angle) * r;
+        if(i === 0) ctx.moveTo(x1, y1);
+        else ctx.lineTo(x1, y1);
+        const angle2 = ((i * 72) + 36 - 90) * Math.PI / 180;
+        const x2 = cx + Math.cos(angle2) * r * 0.4;
+        const y2 = cy + Math.sin(angle2) * r * 0.4;
+        ctx.lineTo(x2, y2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.strokeStyle = '#cc0000';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for(let i = 0; i < 5; i++) {
+        const angle = (i * 72 - 90) * Math.PI / 180;
+        const x1 = cx + Math.cos(angle) * (r * 0.7);
+        const y1 = cy + Math.sin(angle) * (r * 0.7);
+        if(i === 0) ctx.moveTo(x1, y1);
+        else ctx.lineTo(x1, y1);
+        const angle2 = ((i * 72) + 36 - 90) * Math.PI / 180;
+        const x2 = cx + Math.cos(angle2) * (r * 0.7) * 0.4;
+        const y2 = cy + Math.sin(angle2) * (r * 0.7) * 0.4;
+        ctx.lineTo(x2, y2);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#ffcc00';
+    ctx.lineWidth = 4;
+    const hammerX = cx, hammerY = cy + 15;
+    ctx.beginPath();
+    ctx.moveTo(hammerX - 8, hammerY + 25);
+    ctx.lineTo(hammerX + 8, hammerY + 25);
+    ctx.lineTo(hammerX + 5, hammerY - 5);
+    ctx.lineTo(hammerX - 5, hammerY - 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#aa8800';
+    ctx.stroke();
+    
+    ctx.fillStyle = '#ffcc00';
+    ctx.beginPath();
+    ctx.moveTo(hammerX, hammerY - 30);
+    ctx.lineTo(hammerX - 15, hammerY + 5);
+    ctx.lineTo(hammerX - 5, hammerY + 5);
+    ctx.lineTo(hammerX, hammerY - 5);
+    ctx.lineTo(hammerX + 5, hammerY + 5);
+    ctx.lineTo(hammerX + 15, hammerY + 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#aa8800';
+    ctx.stroke();
+    
+    ctx.strokeStyle = '#ffcc00';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(hammerX, hammerY - 35, 10, 0, Math.PI * 1.8);
+    ctx.stroke();
+    
+    return new THREE.CanvasTexture(canvas);
+}
+
+function generateFlags() {
+    const poleMat = new THREE.MeshLambertMaterial({color: 0x333333});
+    const flagTexture = createSovietFlagTexture();
+    const flagMat = new THREE.MeshLambertMaterial({map: flagTexture, side: THREE.DoubleSide});
+    
+    for(let i = 0; i < 15; i++) {
+        const x = (Math.random() - 0.5) * 280;
+        const z = (Math.random() - 0.5) * 280;
+        if(Math.abs(x) < 15 && Math.abs(z) < 15) continue;
+        
+        const poleHeight = 8 + Math.random() * 4;
+        const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.1, 0.1, poleHeight),
+            poleMat
+        );
+        pole.position.set(x, poleHeight / 2, z);
+        
+        const flagWidth = 2.5;
+        const flagHeight = 1.5;
+        const flag = new THREE.Mesh(
+            new THREE.PlaneGeometry(flagWidth, flagHeight),
+            flagMat
+        );
+        flag.position.set(x + flagWidth / 2 + 0.1, poleHeight - flagHeight / 2 - 0.5, z);
+        
+        scene.add(pole);
+        scene.add(flag);
     }
 }
 
