@@ -434,8 +434,7 @@ function spawnZombie() {
         mesh: z, hp: 4, speed: 1.6 + wave*0.2, cooldown: 0,
         animTime: Math.random() * 10,
         limbs: { armL, armR, legL, legR },
-        isDying: false, deathTime: 0, fallVel: 0, rotVel: new THREE.Vector3(),
-        limbVel: { armL: new THREE.Vector3(), armR: new THREE.Vector3(), legL: new THREE.Vector3(), legR: new THREE.Vector3() }
+        isDying: false, deathTime: 0, riseVel: 1.5, materials: [suitMat, rubberMat, eyeMat, filterMat]
     });
     scene.add(z);
 }
@@ -479,29 +478,17 @@ function updateCombat(dt) {
         if(z.isDying) {
             z.deathTime += dt;
             
-            z.fallVel -= 0.025;
-            z.mesh.position.y += z.fallVel;
+            z.mesh.position.y += z.riseVel * dt;
+            z.riseVel *= 0.99;
             
-            if(z.mesh.position.y <= 0) {
-                z.mesh.position.y = 0;
-                z.fallVel = 0;
-            }
+            const fadeDuration = 2.5;
+            const opacity = Math.max(0, 1 - (z.deathTime / fadeDuration));
+            z.materials.forEach(mat => {
+                mat.transparent = true;
+                mat.opacity = opacity;
+            });
             
-            z.mesh.rotation.x += z.rotVel.x * dt;
-            z.mesh.rotation.y += z.rotVel.y * dt;
-            z.mesh.rotation.z += z.rotVel.z * dt;
-            
-            z.rotVel.multiplyScalar(0.985);
-            
-            const limbDamping = z.mesh.position.y <= 0 ? 0.92 : 0.95;
-            for(let limb in z.limbs) {
-                z.limbs[limb].rotation.x += z.limbVel[limb].x * dt;
-                z.limbs[limb].rotation.y += z.limbVel[limb].y * dt;
-                z.limbs[limb].rotation.z += z.limbVel[limb].z * dt;
-                z.limbVel[limb].multiplyScalar(limbDamping);
-            }
-            
-            if(z.deathTime > 2.5) {
+            if(z.deathTime > fadeDuration) {
                 scene.remove(z.mesh);
                 zombies.splice(zi, 1);
             }
@@ -518,16 +505,7 @@ function updateCombat(dt) {
                 if(z.hp <= 0) { 
                     z.isDying = true;
                     z.deathTime = 0;
-                    z.fallVel = 0;
-                    z.rotVel.set(
-                        (Math.random() - 0.5) * 8,
-                        (Math.random() - 0.5) * 4,
-                        (Math.random() - 0.5) * 8
-                    );
-                    z.limbVel.armL.set((Math.random()-0.5)*12, Math.random()*8, (Math.random()-0.5)*12);
-                    z.limbVel.armR.set((Math.random()-0.5)*12, Math.random()*8, (Math.random()-0.5)*12);
-                    z.limbVel.legL.set((Math.random()-0.5)*10, Math.random()*5, (Math.random()-0.5)*10);
-                    z.limbVel.legR.set((Math.random()-0.5)*10, Math.random()*5, (Math.random()-0.5)*10);
+                    z.riseVel = 1.5 + Math.random() * 0.5;
                     player.reserve += 10; 
                     updateHUD(); 
                 }
