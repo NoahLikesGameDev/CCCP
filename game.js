@@ -61,6 +61,48 @@ function playSound(type) {
         osc.connect(g); g.connect(masterGain);
         osc.start(); osc.stop(now + 0.3);
     }
+    else if(type === 'step') {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(70, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+        g.gain.setValueAtTime(0.15, now);
+        g.gain.linearRampToValueAtTime(0, now + 0.1);
+        osc.connect(g); g.connect(masterGain);
+        osc.start(); osc.stop(now + 0.12);
+    }
+    else if(type === 'reload_out') {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+        g.gain.setValueAtTime(0.1, now);
+        g.gain.linearRampToValueAtTime(0, now + 0.15);
+        osc.connect(g); g.connect(masterGain);
+        osc.start(); osc.stop(now + 0.18);
+    }
+    else if(type === 'reload_in') {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+        g.gain.setValueAtTime(0.15, now);
+        g.gain.linearRampToValueAtTime(0, now + 0.1);
+        osc.connect(g); g.connect(masterGain);
+        osc.start(); osc.stop(now + 0.12);
+        
+        const click = audioCtx.createOscillator();
+        const cg = audioCtx.createGain();
+        click.type = 'triangle';
+        click.frequency.setValueAtTime(1200, now + 0.08);
+        cg.gain.setValueAtTime(0.1, now + 0.08);
+        cg.gain.linearRampToValueAtTime(0, now + 0.12);
+        click.connect(cg); cg.connect(masterGain);
+        click.start(now + 0.08); click.stop(now + 0.15);
+    }
 }
 
 function startMusicLoop() {
@@ -168,7 +210,7 @@ function createBloodDecal() {
 
 // --- GAME ENGINE ---
 let scene, camera, renderer, clock, flashlight, muzzleFlash;
-let player = { height: 1.8, speed: 6.5, jumpStrength: 0.17, yVelocity: 0, isGrounded: true, hp: 100, ammo: 30, magSize: 30, reserve: 120, isReloading: false };
+let player = { height: 1.8, speed: 6.5, jumpStrength: 0.17, yVelocity: 0, isGrounded: true, hp: 100, ammo: 30, magSize: 30, reserve: 120, isReloading: false, isMoving: false, moveTime: 0, stepTimer: 0, reloadAnimTime: 0 };
 let controls = { forward: false, backward: false, left: false, right: false, jump: false };
 let yaw = 0, pitch = 0;
 let zombies = [], bullets = [], buildings = [], bloodParticles = [], decals = [];
@@ -234,7 +276,10 @@ function createWeapon() {
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.5), gunMat);
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3), gunMat);
     barrel.rotation.x = Math.PI/2; barrel.position.set(0, 0.02, -0.4);
-    weaponGroup.add(body, barrel);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.06), gunMat);
+    grip.position.set(0, -0.06, 0.1);
+    weaponGroup.add(body, barrel, grip);
+    
     scene.add(weaponGroup);
 }
 
@@ -331,6 +376,21 @@ function updatePlayer(dt) {
     if (controls.forward) dir.z -= 1; if (controls.backward) dir.z += 1;
     if (controls.left) dir.x -= 1; if (controls.right) dir.x += 1;
     
+    const wasMoving = player.isMoving;
+    player.isMoving = dir.length() > 0 && !player.isReloading;
+    
+    if(player.isMoving) {
+        player.moveTime += dt * 10;
+        player.stepTimer -= dt;
+        if(player.stepTimer <= 0) {
+            playSound('step');
+            player.stepTimer = 0.35;
+        }
+    } else {
+        player.moveTime = 0;
+        player.stepTimer = 0;
+    }
+    
     aimLerp = THREE.MathUtils.lerp(aimLerp, isAiming ? 1 : 0, dt * 15);
     camera.fov = THREE.MathUtils.lerp(75, 55, aimLerp);
     camera.updateProjectionMatrix();
@@ -355,20 +415,49 @@ function updatePlayer(dt) {
     flashlight.position.copy(camera.position);
     flashlight.target.position.copy(camera.position).add(new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion));
     weaponRecoil = THREE.MathUtils.lerp(weaponRecoil, 0, dt * 10);
+    
+    let reloadOffset = 0;
+    let reloadTilt = 0;
+    if(player.isReloading) {
+        player.reloadAnimTime += dt;
+        const rt = player.reloadAnimTime / 1.2;
+        if(rt < 0.33) {
+            reloadOffset = THREE.MathUtils.lerp(0, 0.15, rt / 0.33);
+            reloadTilt = THREE.MathUtils.lerp(0, -0.8, rt / 0.33);
+        } else if(rt < 0.67) {
+            reloadOffset = 0.15;
+            reloadTilt = -0.8;
+        } else {
+            const up = (rt - 0.67) / 0.33;
+            reloadOffset = THREE.MathUtils.lerp(0.15, 0, up);
+            reloadTilt = THREE.MathUtils.lerp(-0.8, 0, up);
+        }
+    }
+    
+    let bobY = 0, bobX = 0;
+    if(player.isMoving && !player.isReloading) {
+        const aimFactor = isAiming ? 0.3 : 1;
+        bobY = Math.sin(player.moveTime) * 0.02 * aimFactor;
+        bobX = Math.cos(player.moveTime * 0.5) * 0.01 * aimFactor;
+    }
+    
     weaponGroup.position.copy(camera.position);
     weaponGroup.rotation.copy(camera.rotation);
     
     const tx = THREE.MathUtils.lerp(0.2, 0.0, aimLerp);
     const ty = THREE.MathUtils.lerp(-0.2, -0.12, aimLerp);
     const tz = THREE.MathUtils.lerp(-0.4, -0.3, aimLerp);
-    weaponGroup.translateZ(tz + weaponRecoil); weaponGroup.translateX(tx); weaponGroup.translateY(ty);
+    weaponGroup.translateZ(tz + weaponRecoil + bobY); 
+    weaponGroup.translateX(tx + bobX); 
+    weaponGroup.translateY(ty - reloadOffset);
+    weaponGroup.rotateX(reloadTilt);
     
     if(muzzleFlash.intensity > 0) muzzleFlash.intensity -= dt * 40;
     survivalTime += dt;
     document.getElementById('timer').innerText = formatTime(survivalTime);
 
     const ch = document.getElementById('crosshair');
-    const scale = dir.length() > 0 ? 1.2 : 1.0;
+    const scale = player.isMoving ? 1.2 : 1.0;
     ch.style.transform = `translate(-50%, -50%) scale(${scale})`;
     ch.style.opacity = isAiming ? '0.2' : '1';
 }
@@ -391,11 +480,17 @@ function shoot() {
 
 function reload() {
     if(player.isReloading || player.ammo === player.magSize || player.reserve <= 0) return;
-    player.isReloading = true; document.getElementById('reload-indicator').style.opacity = '1';
+    player.isReloading = true;
+    player.reloadAnimTime = 0;
+    document.getElementById('reload-indicator').style.opacity = '1';
+    setTimeout(() => { playSound('reload_out'); }, 400);
+    setTimeout(() => { playSound('reload_in'); }, 800);
     setTimeout(() => {
         const give = Math.min(player.magSize - player.ammo, player.reserve);
         player.ammo += give; player.reserve -= give;
-        player.isReloading = false; document.getElementById('reload-indicator').style.opacity = '0';
+        player.isReloading = false;
+        player.reloadAnimTime = 0;
+        document.getElementById('reload-indicator').style.opacity = '0';
         updateHUD();
     }, 1200);
 }
